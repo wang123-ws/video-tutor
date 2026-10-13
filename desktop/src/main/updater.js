@@ -143,6 +143,10 @@ class Updater {
      * 公告就一直不出现。加个随机查询参数按不同 key 缓存，绕开这一层。 */
     const bust = `_=${Date.now()}`;
     const list = [];
+    /* 设置页已不暴露自定义更新源；这个环境变量留给发布前自检：
+     * VT_UPDATE_FEED=<latest.json 地址> 可指向本地/预发布清单做验证。 */
+    const envFeed = process.env.VT_UPDATE_FEED;
+    if (envFeed) list.push(envFeed + (envFeed.includes('?') ? '&' : '?') + bust);
     if (c.feedUrl) {
       list.push(c.feedUrl + (c.feedUrl.includes('?') ? '&' : '?') + bust);
     }

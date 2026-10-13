@@ -232,20 +232,16 @@
           </div>
 
           <h3>更新</h3>
-          <div class="row2">
-            <div class="field">
-              <label>启动时自动检查</label>
-              <select id="cfgAutoUpdate">
-                <option value="on">开（推荐）</option>
-                <option value="off">关</option>
-              </select>
-              <span class="hint">有新版本时在顶部弹出公告，点一下自动下载安装，旧版本会被覆盖掉，笔记和配置都保留。</span>
-            </div>
-            <div class="field">
-              <label>更新源地址</label>
-              <input id="cfgFeedUrl" type="text" placeholder="留空即可（用软件自带源）" />
-              <span class="hint" id="feedHint">软件自带官方更新源，平时不用动这里。只有官方源挂了、或你自己有更快的镜像时才需要填。</span>
-            </div>
+          <div class="field">
+            <label>启动时自动检查</label>
+            <select id="cfgAutoUpdate">
+              <option value="on">开（推荐）</option>
+              <option value="off">关</option>
+            </select>
+            <span class="hint">有新版本时在顶部弹出公告，点一下自动下载安装，旧版本会被覆盖掉，笔记和配置都保留。</span>
+          </div>
+          <div class="field">
+            <span class="hint" id="feedInfo"></span>
           </div>
           <div>
             <button class="btn" id="btnCheckUpdate">检查更新</button>

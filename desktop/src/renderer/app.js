@@ -852,15 +852,10 @@ async function bindSettings() {
   // 更新设置
   const uc = await window.vt.update.config();
   $('#cfgAutoUpdate').value = uc.autoCheck ? 'on' : 'off';
-  $('#cfgFeedUrl').value = uc.feedUrl || '';
-  // 让用户一眼看出「现在会从哪儿检查更新」
-  if (uc.feedUrl) {
-    $('#feedHint').textContent = '当前用这个自定义地址检查更新：' + uc.feedUrl;
-  } else if (uc.defaultFeed) {
-    $('#feedHint').textContent = '当前用软件自带源：' + uc.defaultFeed + '（留空即可，不用改）';
-  } else {
-    $('#feedHint').textContent = '还没配更新源：填一个 latest.json 的地址才能收到更新公告。';
-  }
+  // 更新源只读展示：软件自带、自动检查，用户不需要配置（自定义源能力保留在后端）
+  $('#feedInfo').textContent = uc.defaultFeed
+    ? '更新源：' + uc.defaultFeed + '（软件自带，自动检查，无需设置）'
+    : '更新源：软件自带（自动检查）';
 
   const info = await window.vt.appInfo();
   const storePath = await window.vt.store.path();
@@ -1078,7 +1073,6 @@ function bindUpdate() {
   };
   $('#btnCheckUpdate').onclick = () => doCheckUpdate(false);
   $('#cfgAutoUpdate').onchange = () => window.vt.update.setConfig({ autoCheck: $('#cfgAutoUpdate').value });
-  $('#cfgFeedUrl').onchange = () => window.vt.update.setConfig({ feedUrl: $('#cfgFeedUrl').value.trim() });
 }
 
 function showUpdateBanner(r) {

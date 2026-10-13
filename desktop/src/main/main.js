@@ -573,7 +573,7 @@ ipcMain.handle('shell:open', (_e, p) => shell.openPath(p));
 /* ---------------- 自动更新 ----------------
  * 流程：拉清单 → 比版本 → 推公告 → 下载 → 调安装包静默覆盖安装 → 退出旧进程。
  * 安装包是同一个 appId 的 NSIS 包，装的时候会卸掉旧版本再写新的，用户数据保留，
- * 所以不需要手动卸载。清单地址可在设置页改成任意静态地址（默认读随包的 update.json）。
+ * 所以不需要手动卸载。更新源用软件自带的（随包 update.json），设置页只保留自动检查开关。
  */
 
 /** 默认更新源：随包的 update.json（owner / repo / branch / feedUrl） */
@@ -796,8 +796,9 @@ async function selfTestAudio() {
 
 /**
  * 自动更新链路自检（仅排查用）：
- *   VT_SELFTEST_UPDATE=1 启动，另需 VT_UPDATE_FEED=<latest.json 地址>。
- * 会自动完成：造一条历史记录 → 切设置页填更新源 → 检查更新 → 读公告 → 点更新 →
+ *   VT_SELFTEST_UPDATE=1 启动。可选 VT_UPDATE_FEED=<latest.json 地址> 临时指定更新源
+ * （设置页已不暴露该功能，此环境变量留给发布前自检；不填则用软件自带源）。
+ * 会自动完成：造一条历史记录 → 切设置页 → 检查更新 → 读公告 → 点更新 →
  * 等下载安装 → 旧进程退出。日志写到 <userData>/update-selftest.log。
  * 装完新版会自动启动，看日志最后几行 + 新版关于页的版本号即可确认。
  */
@@ -829,14 +830,7 @@ async function selfTestUpdate() {
 
     await q(`document.querySelector('.rail-item[data-view="settings"]').click(); 'ok'`);
     await sleep(400);
-    const feed = process.env.VT_UPDATE_FEED || '';
-    await q(`(() => {
-      const el = document.querySelector('#cfgFeedUrl');
-      el.value = ${JSON.stringify(feed)};
-      el.dispatchEvent(new Event('change'));
-      return el.value;
-    })()`);
-    log('更新源 = ' + feed);
+    log('更新源 = ' + (process.env.VT_UPDATE_FEED || '软件自带源'));
 
     await q("document.querySelector('#btnCheckUpdate').click(); 'ok'");
     await sleep(5000);
