@@ -1,9 +1,9 @@
 {
   "version": "0.3.2",
-  "notes": "修复已知问题，提升稳定性",
+  "notes": "修复 ASR 中文路径导致无法转写；最小化按钮改为最小化到任务栏（仅关闭按钮收托盘）；修复无独显机器 GPU 崩溃导致 App 退出、按钮无响应；转写调度队列化，间隔不再发散；转写时间戳改为视频位置；设置页显示真实更新源",
   "pubDate": "2026-10-13",
-  "url": "https://github.com/wang123-ws/video-tutor/releases/latest/download/%E8%A7%86%E9%A2%91%E9%99%AA%E5%AD%A6AI%E5%8A%A9%E6%95%99%20Setup%200.3.2.exe",
+  "url": "https://github.com/wang123-ws/video-tutor/releases/latest/download/Setup-0.3.2.exe",
   "size": 250793583,
   "sha512": "0dda1a0821f04507886b65ad3be82029f882c4f9aab5b9c4866b75e9533600128594af0efadeb569477a82f417d3e2b96230fb7564198e1f2a4d0a21ba371365",
-  "fileName": "视频陪学AI助教 Setup 0.3.2.exe"
+  "fileName": "Setup-0.3.2.exe"
 }

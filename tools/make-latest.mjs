@@ -50,7 +50,7 @@ if (!exe) {
   process.exit(1);
 }
 
-const name = path.basename(exe);
+const name = opt('name') || path.basename(exe);
 const size = fs.statSync(exe).size;
 const sha512 = crypto.createHash('sha512').update(fs.readFileSync(exe)).digest('hex');
 
