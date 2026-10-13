@@ -662,6 +662,22 @@ app.on('will-quit', () => dbg('will-quit'));
 app.on('before-quit', () => dbg('before-quit'));
 process.on('exit', (c) => dbg('process exit ' + c));
 
+/* 单实例锁：用户从桌面/开始菜单再点一次图标时，把已有实例的窗口招呼出来，
+ * 第二个进程直接退出。没有这个锁，重复启动会各起一个完整进程——托盘里出现
+ * 两个图标、两份心跳、两个 ASR worker 池抢同一个数据文件，用户看到的就是
+ * 「托盘里有两个应用」。必须在 whenReady 之前调用。 */
+if (!app.requestSingleInstanceLock()) {
+  app.exit(0);
+} else {
+  app.on('second-instance', () => {
+    dbg('second-instance → 唤起已有窗口');
+    /* 首个实例可能刚启动、窗口还没建出来（用户快速双击图标）——这时不用管，
+     * 它自己会建窗口并显示；强行 createMainWindow 会撞上静态服务器未就绪，
+     * 建出一个永远白屏的窗口（createMainWindow 没有防重入保护）。 */
+    if (mainWindow && !mainWindow.isDestroyed()) showMainWindow();
+  });
+}
+
 app.whenReady().then(async () => {
   dbg('ready, starting static server');
   await startStaticServer();
