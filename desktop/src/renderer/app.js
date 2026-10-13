@@ -855,9 +855,9 @@ async function bindSettings() {
   $('#cfgFeedUrl').value = uc.feedUrl || '';
   // 让用户一眼看出「现在会从哪儿检查更新」
   if (uc.feedUrl) {
-    $('#feedHint').textContent = '当前用这个自定义地址检查更新。';
+    $('#feedHint').textContent = '当前用这个自定义地址检查更新：' + uc.feedUrl;
   } else if (uc.defaultFeed) {
-    $('#feedHint').textContent = '当前用软件自带源：' + uc.defaultFeed;
+    $('#feedHint').textContent = '当前用软件自带源：' + uc.defaultFeed + '（留空即可，不用改）';
   } else {
     $('#feedHint').textContent = '还没配更新源：填一个 latest.json 的地址才能收到更新公告。';
   }

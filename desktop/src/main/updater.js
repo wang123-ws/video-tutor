@@ -33,10 +33,11 @@ const { shell } = require('electron');
 const UA = 'video-tutor-updater';
 
 /* GitHub 直连在国内经常超时，下载时按前缀逐个试镜像。
- * 前缀直接拼在完整 URL 前面即可（ghfast / gh-proxy 这类加速服务的通用用法）。 */
+ * 前缀直接拼在完整 URL 前面即可（ghfast / gh-proxy 这类加速服务的通用用法）。
+ * 国内用户为主，ghfast 放第一位：直连失败要等满超时才切，白白多等 20 秒。 */
 const MIRRORS = [
-  '',
   'https://ghfast.top/',
+  '',
   'https://gh-proxy.com/',
   'https://ghproxy.net/',
 ];
