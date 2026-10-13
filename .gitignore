@@ -1,0 +1,27 @@
+# 私有密钥，切勿提交
+extension/src/core/config.local.js
+desktop/devkey.json
+
+node_modules/
+dist/
+*.log
+.DS_Store
+Thumbs.db
+
+# 本地语音引擎（体积大，用 node tools/fetch-asr.mjs 重新下载）
+desktop/resources/asr/**/*.tar.bz2
+desktop/resources/asr/sherpa-onnx-*/
+desktop/resources/asr/sensevoice/*.onnx
+desktop/resources/asr/sensevoice/tokens.txt
+desktop/resources/asr/_*.wav
+desktop/resources/asr/_*.log
+desktop/resources/asr/log.txt
+
+# 打包产物
+desktop/dist/
+*.crx
+*.zip
+!extension/vendor/*.js
+
+# 本地工作区记忆（不属于代码仓库）
+.workbuddy/

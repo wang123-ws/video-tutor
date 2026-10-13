@@ -1,0 +1,42 @@
+body {
+  margin: 0; padding: 32px 16px 64px;
+  background: #14161c; color: #e7eaf2;
+  font: 13.5px/1.6 "Microsoft YaHei", "PingFang SC", system-ui, sans-serif;
+}
+.wrap { max-width: 640px; margin: 0 auto; }
+h1 { font-size: 20px; margin: 0 0 6px; }
+h2 { font-size: 14px; margin: 0 0 12px; color: #8fb0ff; letter-spacing: .5px; }
+section {
+  background: #1b1e26; border: 1px solid #2b3040; border-radius: 12px;
+  padding: 16px 18px; margin-bottom: 14px;
+}
+.f { margin-bottom: 10px; }
+.f2 { display: flex; gap: 10px; margin-bottom: 10px; }
+.f2 > div { flex: 1; }
+label { display: block; font-size: 12px; color: #8b93a7; margin-bottom: 4px; }
+input[type="text"], input[type="password"], input[type="number"], select {
+  width: 100%; box-sizing: border-box;
+  background: #21252f; color: #e7eaf2; border: 1px solid #2b3040;
+  border-radius: 8px; padding: 7px 9px; font: inherit; font-size: 13px; outline: none;
+}
+input:focus, select:focus { border-color: #4f7cff; }
+.chk { display: flex; align-items: center; gap: 7px; font-size: 12.5px; color: #cfd5e4; margin: 6px 0; }
+.chk input { width: auto; }
+.acts { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+.acts.big { margin-top: 4px; }
+.btn {
+  padding: 8px 16px; border-radius: 8px; cursor: pointer; font: 600 13px inherit;
+  border: 1px solid #333a49; background: #262b36; color: #e7eaf2;
+}
+.btn:hover { background: #2f3542; }
+.btn.primary { background: linear-gradient(135deg, #4f7cff, #7b5cff); border: none; color: #fff; }
+.btn.ghost { background: transparent; color: #8b93a7; }
+.note {
+  margin-top: 6px; font-size: 11.5px; line-height: 1.6; color: #8b93a7;
+  background: #21252f; border-left: 2px solid #4f7cff; border-radius: 0 6px 6px 0; padding: 7px 9px;
+}
+.res { font-size: 12px; color: #34d399; }
+.res.err { color: #ff8f9b; }
+.tip { color: #8b93a7; font-size: 12px; }
+.tip.warn { color: #ffb37a; background: rgba(255,138,61,.08); border-left: 2px solid #ff8a3d; padding: 8px 10px; border-radius: 0 6px 6px 0; }
+code { background: #262b36; padding: 1px 5px; border-radius: 4px; font-size: 11.5px; }

@@ -1,0 +1,72 @@
+{
+  "name": "video-tutor",
+  "version": "0.3.2",
+  "description": "视频陪学 AI 助教 · 桌面客户端（听系统声音，实时转写并提炼知识点）",
+  "main": "src/main/main.js",
+  "scripts": {
+    "sync-core": "node ../tools/sync-core.mjs",
+    "start": "npm run sync-core && electron .",
+    "start:safe": "npm run sync-core && electron . --vt-safe",
+    "dist": "npm run sync-core && electron-builder --win nsis",
+    "dist:portable": "npm run sync-core && electron-builder --win portable",
+    "latest": "node ../tools/make-latest.mjs",
+    "fetch-asr": "node ../tools/fetch-asr.mjs"
+  },
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "cn.workbuddy.videotutor",
+    "productName": "视频陪学AI助教",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "src/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "resources/asr",
+        "to": "asr",
+        "filter": [
+          "**/*",
+          "!**/*.tar.bz2",
+          "!**/_*"
+        ]
+      },
+      {
+        "from": "resources/icon.ico",
+        "to": "icon.ico"
+      },
+      {
+        "from": "devkey.json",
+        "to": "devkey.json"
+      },
+      {
+        "from": "update.json",
+        "to": "update.json"
+      }
+    ],
+    "forceCodeSigning": false,
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "resources/icon.ico",
+      "signAndEditExecutable": false,
+      "signDlls": false
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "视频陪学AI助教"
+    },
+    "compression": "normal",
+    "asar": true
+  }
+}

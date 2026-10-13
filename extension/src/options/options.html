@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>视频陪学 AI 助教 · 设置</title>
+  <link rel="stylesheet" href="options.css" />
+</head>
+<body>
+  <div class="wrap">
+    <h1>视频陪学 AI 助教 · 设置</h1>
+    <p class="tip">所有配置保存在本地浏览器，不会上传到任何第三方服务器（除你填写的 API 地址）。</p>
+
+    <section>
+      <h2>大模型（知识点提炼）</h2>
+      <div class="f">
+        <label>服务商预设（一键切换）</label>
+        <select id="provider"></select>
+        <div class="note" id="providerNote"></div>
+      </div>
+      <div class="f">
+        <label>API Base（OpenAI 兼容）</label>
+        <input id="apiBase" type="text" placeholder="https://open.bigmodel.cn/api/paas/v4" />
+      </div>
+      <div class="f">
+        <label>API Key</label>
+        <input id="apiKey" type="password" placeholder="sk-..." />
+      </div>
+      <div class="f2">
+        <div>
+          <label>模型</label>
+          <input id="chatModel" type="text" placeholder="Qwen/Qwen3-8B" />
+        </div>
+        <div>
+          <label>备用模型</label>
+          <input id="chatModelFallback" type="text" />
+        </div>
+      </div>
+      <div class="f2">
+        <div>
+          <label>温度</label>
+          <input id="temperature" type="number" step="0.05" min="0" max="1" />
+        </div>
+        <div>
+          <label>最大 Token</label>
+          <input id="maxTokens" type="number" step="128" min="256" />
+        </div>
+      </div>
+      <label class="chk"><input id="enableThinking" type="checkbox" /> 关闭模型思考过程（推荐，输出更快）</label>
+      <div class="acts">
+        <button id="btnTest" class="btn">测试连接</button>
+        <button id="btnGrant" class="btn ghost">授权访问该域名</button>
+        <span id="testResult" class="res"></span>
+      </div>
+    </section>
+
+    <section>
+      <h2>语音转写</h2>
+      <div class="f">
+        <label>默认转写源</label>
+        <select id="asrMode">
+          <option value="auto">自动（优先页面字幕）</option>
+          <option value="webspeech">麦克风语音识别（浏览器内置，免费）</option>
+          <option value="manual">手动粘贴文本</option>
+          <option value="cloud">页面音频 + 云端 ASR</option>
+        </select>
+      </div>
+      <div class="f2">
+        <div>
+          <label>云端 ASR 模型</label>
+          <input id="asrModel" type="text" />
+        </div>
+        <div>
+          <label>识别语言</label>
+          <input id="asrLang" type="text" placeholder="zh-CN" />
+        </div>
+      </div>
+      <div class="f">
+        <label>音频分段时长（秒）</label>
+        <input id="chunkSeconds" type="number" min="5" max="60" />
+      </div>
+    </section>
+
+    <section>
+      <h2>助教节奏</h2>
+      <div class="f2">
+        <div>
+          <label>触发提取的累计字数</label>
+          <input id="extractChars" type="number" min="80" step="20" />
+        </div>
+        <div>
+          <label>最长提取间隔（毫秒）</label>
+          <input id="extractIntervalMs" type="number" min="5000" step="1000" />
+        </div>
+      </div>
+      <div class="f2">
+        <div>
+          <label>去重相似度阈值</label>
+          <input id="dedupThreshold" type="number" min="0.3" max="0.95" step="0.02" />
+        </div>
+        <div>
+          <label>图谱样式</label>
+          <select id="graphStyle">
+            <option value="mindmap">思维导图 mindmap</option>
+            <option value="flowchart">流程图 flowchart</option>
+          </select>
+        </div>
+      </div>
+      <label class="chk"><input id="saveHistory" type="checkbox" /> 课程结束后自动保存历史</label>
+    </section>
+
+    <div class="acts big">
+      <button id="btnSave" class="btn primary">保存设置</button>
+      <button id="btnReset" class="btn ghost">恢复默认</button>
+      <span id="saveResult" class="res"></span>
+    </div>
+
+    <p class="tip warn">
+      安全提示：如果你要把本项目推到 GitHub，请勿把 API Key 写进任何被跟踪的文件。
+      私有密钥应放在 <code>extension/src/core/config.local.js</code>（已在 .gitignore 中忽略）。
+    </p>
+  </div>
+  <script type="module" src="options.js"></script>
+</body>
+</html>

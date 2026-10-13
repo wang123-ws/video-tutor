@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>视频陪学 AI 助教 · 网页端</title>
+<script src="../extension/vendor/mermaid.min.js"></script>
+<style>
+:root{
+  --bg:#14161c;--panel:#1b1e26;--panel2:#21252f;--line:#2b3040;
+  --text:#e7eaf2;--muted:#8b93a7;--accent:#4f7cff;--accent2:#7b5cff;
+  --danger:#ff5b6e;--warn:#ff8a3d;--ok:#34d399;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);
+  font:13.5px/1.6 "Microsoft YaHei","PingFang SC",system-ui,sans-serif}
+.hd{display:flex;align-items:center;gap:12px;padding:14px 22px;border-bottom:1px solid var(--line);background:var(--panel)}
+.logo{width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,var(--accent),var(--accent2));
+  display:flex;align-items:center;justify-content:center;font-weight:800;color:#fff}
+.hd h1{margin:0;font-size:16px}
+.hd .sub{color:var(--muted);font-size:12px}
+.badge{margin-left:auto;font-size:11.5px;padding:4px 10px;border-radius:999px;
+  background:var(--panel2);border:1px solid var(--line);color:var(--muted)}
+.badge.listening{background:rgba(52,211,153,.14);color:var(--ok);border-color:rgba(52,211,153,.4)}
+.badge.paused{background:rgba(255,138,61,.14);color:var(--warn);border-color:rgba(255,138,61,.4)}
+.badge.ended{background:rgba(79,124,255,.14);color:var(--accent);border-color:rgba(79,124,255,.4)}
+.wrap{display:grid;grid-template-columns:400px 1fr;gap:14px;padding:14px 22px;height:calc(100vh - 64px)}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;display:flex;flex-direction:column;min-height:0}
+.card h3{margin:0 0 10px;font-size:13px;color:#8fb0ff;letter-spacing:.5px}
+input[type=text],textarea,select{width:100%;background:var(--panel2);color:var(--text);
+  border:1px solid var(--line);border-radius:8px;padding:7px 9px;font:inherit;font-size:13px;outline:none}
+input:focus,textarea:focus,select:focus{border-color:var(--accent)}
+textarea{resize:vertical;flex:1;min-height:150px}
+.f{margin-bottom:9px}
+label{display:block;font-size:12px;color:var(--muted);margin-bottom:4px}
+.btns{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.btn{flex:1;min-width:76px;padding:7px 10px;border-radius:8px;cursor:pointer;
+  border:1px solid var(--line);background:var(--panel2);color:var(--text);font:600 12.5px inherit;transition:.15s}
+.btn:hover{background:#2a2f3c;border-color:#3a4150}
+.btn.primary{background:linear-gradient(135deg,var(--accent),var(--accent2));border:none;color:#fff}
+.btn.danger{background:rgba(255,91,110,.12);border-color:rgba(255,91,110,.35);color:#ff8f9b}
+.btn.ghost{color:var(--muted)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.notes{overflow:auto;flex:1;padding-right:4px}
+.notes::-webkit-scrollbar,.graph::-webkit-scrollbar,.right::-webkit-scrollbar{width:8px}
+.notes::-webkit-scrollbar-thumb,.graph::-webkit-scrollbar-thumb,.right::-webkit-scrollbar-thumb{background:#333a49;border-radius:4px}
+.sec{margin-bottom:12px}
+.sec-hd{font-size:12px;font-weight:700;color:var(--accent);padding:4px 0;border-bottom:1px dashed var(--line);margin-bottom:7px}
+.sec-sum{background:rgba(79,124,255,.08);border-left:2px solid var(--accent);padding:6px 9px;
+  border-radius:0 6px 6px 0;font-size:12px;color:#b9c2da;margin-bottom:7px}
+.note{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:7px 10px;margin-bottom:6px}
+.tag{flex:none;font-size:10.5px;padding:1px 6px;border-radius:4px;font-weight:700;margin-right:6px}
+.tag.重点{background:rgba(79,124,255,.16);color:#8fb0ff}
+.tag.易错点{background:rgba(255,91,110,.16);color:#ff8f9b}
+.tag.拓展{background:rgba(160,107,255,.16);color:#c4a3ff}
+.nb{font-size:12.5px;color:#cfd5e4}
+.nk{margin-top:4px;display:flex;gap:4px;flex-wrap:wrap}
+.nk span{font-size:10px;color:var(--muted);background:#262b36;padding:1px 6px;border-radius:4px}
+.right{display:flex;flex-direction:column;gap:14px;min-height:0}
+.graph{overflow:auto;background:var(--panel2);border-radius:8px;padding:10px;min-height:120px}
+.graph svg{max-width:100%;height:auto;display:block;margin:0 auto}
+.graph .mmd{white-space:pre-wrap;font-family:Consolas,monospace;font-size:11.5px;color:var(--muted)}
+.empty{color:var(--muted);font-size:12.5px;padding:20px;text-align:center}
+.topics{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px}
+.chip{font-size:11.5px;padding:2px 9px;border-radius:999px;cursor:pointer;
+  background:var(--panel2);border:1px solid var(--line);color:#b9c2da}
+.chip:hover{border-color:var(--accent);color:#cfd8ff}
+.detail{background:var(--panel2);border-radius:8px;padding:10px;font-size:12.5px;margin-top:8px}
+.detail h4{margin:8px 0 3px;font-size:12px;color:var(--accent)}
+.detail h4:first-child{margin-top:0}
+.detail p{margin:0 0 6px;color:#cfd5e4}
+.hint{color:var(--muted);font-size:11.5px;margin-top:6px}
+.toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:rgba(30,34,44,.97);
+  border:1px solid var(--line);padding:8px 16px;border-radius:8px;font-size:12.5px;display:none;z-index:99}
+</style>
+</head>
+<body>
+<div class="hd">
+  <div class="logo">AI</div>
+  <div>
+    <h1>视频陪学 AI 助教 <span style="font-size:11px;color:var(--muted)">· 网页端（多端捕获助手之一）</span></h1>
+    <div class="sub" id="sub">把课程讲稿/字幕贴进来，助教实时提炼笔记并生成知识图谱</div>
+  </div>
+  <span class="badge" id="badge">待命</span>
+</div>
+
+<div class="wrap">
+  <div class="card">
+    <h3>课程输入（模拟捕获助手推送）</h3>
+    <div class="f">
+      <label>课程主题</label>
+      <input id="topic" type="text" placeholder="例如：TCP 三次握手与四次挥手" />
+    </div>
+    <div class="f" style="flex:1;display:flex;flex-direction:column">
+      <label>讲课文本（粘贴讲稿 / 字幕，或点「麦克风」直接说）</label>
+      <textarea id="input" placeholder="在这里粘贴课程字幕或讲稿…"></textarea>
+    </div>
+    <div class="btns">
+      <button class="btn primary" id="btnStart">开始陪学</button>
+      <button class="btn" id="btnPush">推送</button>
+      <button class="btn" id="btnMic">🎙 麦克风</button>
+    </div>
+    <div class="btns">
+      <button class="btn" id="btnPause">暂停 / 小结</button>
+      <button class="btn danger" id="btnEnd">课程结束</button>
+      <button class="btn ghost" id="btnDemo">示例文本</button>
+    </div>
+    <div class="btns">
+      <button class="btn ghost" id="btnExport">导出 Markdown</button>
+      <button class="btn ghost" id="btnClear">清空</button>
+    </div>
+    <div class="hint" id="hint"></div>
+  </div>
+
+  <div class="right">
+    <div class="card" style="flex:1">
+      <h3>结构化笔记 <span style="float:right;color:var(--muted);font-weight:400" id="cnt">0 条</span></h3>
+      <div class="notes" id="notes"><div class="empty">开始后，知识点会自动出现在这里</div></div>
+    </div>
+    <div class="card">
+      <h3>知识图谱</h3>
+      <div class="topics" id="topics"></div>
+      <div class="graph" id="graph"><div class="empty">课程结束后生成</div></div>
+      <div id="detail"></div>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script type="module">
+import { loadConfig } from '../extension/src/core/config.js';
+import { Tutor } from '../extension/src/core/tutor.js';
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const DEMO = `今天我们来讲 TCP 的三次握手。所谓三次握手，就是 TCP 建立连接时客户端和服务器之间要交换三个报文。第一次，客户端发送 SYN 报文，序列号 seq 等于 x。
+第二次，服务器收到后回复 SYN 加 ACK 报文，确认号 ack 等于 x 加 1，同时自己也带一个序列号 seq 等于 y。第三次，客户端再回一个 ACK，确认号 ack 等于 y 加 1。到这里连接就建立了。
+这里有个易错点：很多同学会误以为三次握手是为了保证数据不丢失，其实不是。三次握手的根本目的是确认双方各自的初始序列号，防止历史重复连接初始化造成混乱。
+对比一下四次挥手。TCP 断开连接要四次挥手，因为 TCP 是全双工的，每个方向都要单独关闭。所以需要 FIN 和 ACK 分别来回两次。这就是两者的区别。
+考点来了：为什么是三次而不是两次？如果只有两次握手，服务器发出去的确认报文如果丢失，服务器会以为连接已建立并一直等着，造成资源浪费。这是面试常考的题。
+再拓展一下，SYN 泛洪攻击就是利用了三次握手的半连接状态。攻击者大量发送 SYN 而不回最后的 ACK，服务器会维护大量半连接队列，最终耗尽资源。防护手段是 SYN Cookie。`;
+
+let cfg = await loadConfig();
+let tutor, mic = null, micOn = false;
+
+function toast(t, ms=2000){ const e=$('#toast'); e.textContent=t; e.style.display='block'; clearTimeout(e._t); e._t=setTimeout(()=>e.style.display='none', ms); }
+
+function newTutor(){
+  tutor = new Tutor(cfg, { emit(type, p){
+    if(type==='error') toast('⚠ '+p.message, 5000);
+    if(type==='log' && p.level==='warn') console.warn(p.text);
+  }});
+}
+newTutor();
+
+function setState(){
+  const s = tutor.snapshot();
+  const T = {idle:'待命',listening:'听课中',paused:'已暂停',ended:'已结束'};
+  $('#badge').textContent = T[s.state]||s.state;
+  $('#badge').className = 'badge ' + (s.state==='idle'?'':s.state);
+  $('#cnt').textContent = s.notes.length + ' 条';
+  $('#sub').textContent = (s.topic||'未命名课程') + ' · ' + (s.usingLLM ? '大模型提炼 ('+cfg.chatModel+')' : '本地规则引擎（零成本）');
+  renderNotes(s);
+  if(s.graph) renderGraph(s.graph);
+}
+
+function renderNotes(s){
+  const box = $('#notes');
+  if(!s.notes.length){ box.innerHTML = '<div class="empty">开始后，知识点会自动出现在这里</div>'; return; }
+  const map = new Map(s.notes.map(n=>[n.id,n]));
+  let h='';
+  s.sections.forEach((sec,i)=>{
+    const ns = sec.noteIds.map(id=>map.get(id)).filter(Boolean);
+    if(!ns.length && !sec.summary) return;
+    h += `<div class="sec"><div class="sec-hd">第 ${i+1} 节　${esc(sec.title||'')}</div>`;
+    if(sec.summary) h += `<div class="sec-sum">${esc(sec.summary)}</div>`;
+    ns.forEach(n=>{
+      const kw = (n.keywords||[]).map(k=>`<span>${esc(k)}</span>`).join('');
+      h += `<div class="note"><span class="tag ${esc(n.tag)}">${esc(n.tag)}</span><span class="nb"><b>${esc(n.title)}</b> — ${esc(n.body)}</span>${kw?`<div class="nk">${kw}</div>`:''}</div>`;
+    });
+    h += '</div>';
+  });
+  const used = new Set(s.sections.flatMap(x=>x.noteIds));
+  const rest = s.notes.filter(n=>!used.has(n.id));
+  if(rest.length){
+    h += '<div class="sec"><div class="sec-hd">当前小节（未小结）</div>';
+    rest.forEach(n=>{
+      const kw = (n.keywords||[]).map(k=>`<span>${esc(k)}</span>`).join('');
+      h += `<div class="note"><span class="tag ${esc(n.tag)}">${esc(n.tag)}</span><span class="nb"><b>${esc(n.title)}</b> — ${esc(n.body)}</span>${kw?`<div class="nk">${kw}</div>`:''}</div>`;
+    });
+    h += '</div>';
+  }
+  box.innerHTML = h; box.scrollTop = box.scrollHeight;
+}
+
+let mmd = '';
+async function renderGraph(g){
+  mmd = g.mermaid || '';
+  $('#topics').innerHTML = (g.topics||[]).slice(0,60).map(t=>`<span class="chip" data-t="${esc(t)}">${esc(t)}</span>`).join('');
+  $('#topics').querySelectorAll('.chip').forEach(c=>c.onclick=()=>openTopic(c.dataset.t));
+  const M = window.mermaid;
+  if(!M){ $('#graph').innerHTML = `<div class="mmd">${esc(mmd)}</div>`; return; }
+  try{
+    M.initialize({startOnLoad:false, theme:'dark', securityLevel:'loose', mindmap:{padding:14}});
+    const {svg} = await M.render('g'+Date.now(), mmd);
+    $('#graph').innerHTML = svg;
+    $('#graph').querySelectorAll('g').forEach(el=>{
+      el.style.cursor='pointer';
+      el.onclick=()=>{ const t=el.textContent?.trim(); if(t&&t.length<=20) openTopic(t); };
+    });
+  }catch(e){ $('#graph').innerHTML = `<div class="mmd">${esc(mmd)}</div>`; }
+}
+
+async function openTopic(t){
+  $('#detail').innerHTML = `<div class="detail"><div class="empty">正在展开「${esc(t)}」…</div></div>`;
+  const d = await tutor.queryTopic(t);
+  $('#detail').innerHTML = `<div class="detail">
+    <h4>${esc(d.topic)} · 定义</h4><p>${esc(d.definition||'—')}</p>
+    <h4>例子</h4><p>${esc(d.example||'—')}</p>
+    <h4>考点</h4><p>${esc(d.examPoints||'—')}</p>
+    <h4>关联知识点</h4><p>${(d.related||[]).map(esc).join('、')||'—'}</p></div>`;
+}
+
+async function pushText(text){
+  const clean = String(text).replace(/^\d+\s*$/gm,'')
+    .replace(/\d{2}:\d{2}:\d{2}[,.]\d{3}\s*-->\s*\d{2}:\d{2}:\d{2}[,.]\d{3}/g,'')
+    .replace(/\s+/g,' ').trim();
+  if(!clean) return;
+  const parts = clean.match(/[^。！？；\n]{0,120}[。！？；]?/g)?.filter(s=>s.trim()) || [clean];
+  for(let i=0;i<parts.length;i++){ tutor.pushSegment({text:parts[i]}); if(i%2===0) await new Promise(r=>setTimeout(r,40)); }
+  await tutor.extract();
+  setState();
+  toast('已推送 '+parts.length+' 段');
+}
+
+$('#btnStart').onclick = () => {
+  tutor.start({topic: $('#topic').value.trim()});
+  setState(); toast('助教进入听课状态');
+};
+$('#btnPush').onclick = async () => { await pushText($('#input').value); $('#input').value=''; };
+$('#btnDemo').onclick = () => { $('#input').value = DEMO; $('#topic').value = $('#topic').value || 'TCP 三次握手与四次挥手'; };
+$('#btnPause').onclick = async () => { await tutor.pause(); setState(); toast('已暂停，本小节小结已生成'); };
+$('#btnEnd').onclick = async () => { toast('正在生成总笔记与图谱…',6000); await tutor.end(); setState(); toast('课程结束'); };
+$('#btnClear').onclick = () => { tutor.reset(); $('#graph').innerHTML='<div class="empty">课程结束后生成</div>'; $('#topics').innerHTML=''; $('#detail').innerHTML=''; setState(); };
+$('#btnExport').onclick = () => {
+  const md = tutor.toMarkdown();
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([md],{type:'text/markdown;charset=utf-8'}));
+  a.download = `课程笔记_${new Date().toISOString().slice(0,16).replace(/[:T]/g,'-')}.md`;
+  a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+};
+
+$('#btnMic').onclick = () => {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if(!SR){ toast('当前浏览器不支持内置语音识别，请粘贴文本'); return; }
+  if(micOn){ mic.stop(); micOn=false; $('#btnMic').textContent='🎙 麦克风'; return; }
+  mic = new SR(); mic.lang='zh-CN'; mic.continuous=true; mic.interimResults=true;
+  let buf='';
+  mic.onresult = e => { for(let i=e.resultIndex;i<e.results.length;i++) if(e.results[i].isFinal) buf += e.results[i][0].transcript; };
+  mic.onerror = e => toast('识别错误：'+e.error, 4000);
+  mic.onend = () => { if(micOn){ if(buf.trim()){ pushText(buf); buf=''; } try{mic.start();}catch(_){} } };
+  try{ mic.start(); micOn=true; $('#btnMic').textContent='⏹ 停止'; toast('麦克风已开启'); }
+  catch(e){ toast('无法启动麦克风：'+e.message); }
+};
+
+$('#hint').textContent = cfg.apiKey ? '已检测到 API Key，将优先用大模型提炼；失败自动降级本地引擎。' : '未配置 API Key，使用本地规则引擎（零成本、离线可用）。';
+setState();
+window.__vt = { tutor, setState };
+</script>
+</body>
+</html>

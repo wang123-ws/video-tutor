@@ -1,0 +1,63 @@
+{
+  "manifest_version": 3,
+  "name": "视频陪学 AI 助教",
+  "version": "0.1.0",
+  "minimum_chrome_version": "116",
+  "description": "实时听课程、自动提炼知识点、生成结构化笔记与 Mermaid 知识图谱的陪学助手",
+  "homepage_url": "https://github.com/",
+  "icons": {
+    "16": "assets/icon16.png",
+    "32": "assets/icon32.png",
+    "48": "assets/icon48.png",
+    "128": "assets/icon128.png"
+  },
+  "permissions": [
+    "storage",
+    "scripting",
+    "activeTab",
+    "tabs",
+    "tabCapture",
+    "offscreen",
+    "sidePanel",
+    "downloads",
+    "unlimitedStorage"
+  ],
+  "optional_host_permissions": ["https://*/*", "http://*/*"],
+  "host_permissions": [
+    "https://api-inference.modelscope.cn/*",
+    "https://api.siliconflow.cn/*",
+    "https://open.bigmodel.cn/*",
+    "https://dashscope.aliyuncs.com/*",
+    "https://api.deepseek.com/*",
+    "https://openrouter.ai/*"
+  ],
+  "background": {
+    "service_worker": "src/background/service_worker.js",
+    "type": "module"
+  },
+  "action": {
+    "default_title": "视频陪学 AI 助教",
+    "default_icon": {
+      "16": "assets/icon16.png",
+      "32": "assets/icon32.png",
+      "48": "assets/icon48.png",
+      "128": "assets/icon128.png"
+    }
+  },
+  "side_panel": {
+    "default_path": "src/sidepanel/sidepanel.html"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["src/content/content.js"],
+      "css": ["src/content/content.css"],
+      "run_at": "document_idle",
+      "all_frames": false
+    }
+  ],
+  "options_ui": {
+    "page": "src/options/options.html",
+    "open_in_tab": true
+  }
+}

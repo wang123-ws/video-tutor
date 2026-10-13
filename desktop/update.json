@@ -1,0 +1,7 @@
+{
+  "_说明": "自动更新的默认源。客户端启动后自动读取该仓库 main 分支下的 latest.json（jsDelivr CDN 优先，raw + 镜像自动切换）。发布新版本：上传安装包到 GitHub Releases，然后运行 node tools/make-latest.mjs 生成 latest.json 并推送。",
+  "owner": "wang123-ws",
+  "repo": "video-tutor",
+  "branch": "main",
+  "downloadBase": ""
+}

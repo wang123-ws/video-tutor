@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<title>陪学</title>
+<link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+<div class="float">
+  <div class="float-top">
+    <span class="dot" style="width:8px;height:8px;border-radius:2px;background:var(--accent);display:inline-block"></span>
+    <span class="name">陪学中</span>
+    <span class="lvl" title="实时音量：放视频时这里会跳动"><i id="fLvl"></i></span>
+    <span class="spacer"></span>
+    <button id="fExpand" title="回到主窗口">
+      <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor"><rect x="0.5" y="0.5" width="9" height="9"/></svg>
+    </button>
+  </div>
+  <div class="float-body">
+    <div class="line" id="fLast">正在听…</div>
+    <div class="line dim" id="fNote1"></div>
+    <div class="line dim" id="fNote2"></div>
+  </div>
+  <div class="float-foot">
+    <span id="fState">待命</span>
+    <span class="mono" id="fBuf"></span>
+    <span class="spacer"></span>
+    <span class="mono" id="fCount">0 条</span>
+    <span class="mono" id="fTime">00:00</span>
+  </div>
+</div>
+<script type="module" src="./float.js"></script>
+</body>
+</html>
