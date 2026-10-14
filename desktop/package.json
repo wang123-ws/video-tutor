@@ -1,6 +1,6 @@
 {
   "name": "video-tutor",
-  "version": "0.3.2",
+  "version": "0.4.0",
   "description": "视频陪学 AI 助教 · 桌面客户端（听系统声音，实时转写并提炼知识点）",
   "main": "src/main/main.js",
   "scripts": {

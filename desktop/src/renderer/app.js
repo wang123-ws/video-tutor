@@ -76,6 +76,7 @@ async function boot() {
 
   app.tutor = new Tutor(app.cfg, { emit: onTutorEvent });
   app.sessions = await loadSessions();
+  await seedSampleIfFirstRun();   // 首次启动放一条固定示例（store 里从没有过记录才放）
   await rescueDraft();
 
   bindWindowButtons();
@@ -87,6 +88,10 @@ async function boot() {
   await refreshSources();
   await checkAsr();
   renderSessionList();
+  /* 有记录就把最近一条直接摆进主区域：一进来就看到「这东西能产出什么」，
+   * 而不是一个写着「未开始」的空屏幕——列表点击回看也因此有了默认落点。 */
+  if (app.sessions.length) renderHistory(app.sessions[0]);
+  else resetStudyUI();
 
   // 启动后静默查一次更新，有新版才弹公告，没网/没新版就什么都不显示
   setTimeout(() => doCheckUpdate(true), 4000);
@@ -175,7 +180,13 @@ async function checkAsr() {
 /* ============================ 陪学 ============================ */
 
 function bindStudy() {
-  $('#btnStart').onclick = startStudy;
+  /* 开始按钮在不同模式下干不同的事：回看历史记录时走新建流程（先起名），
+   * 否则直接开始陪学。回看时主区域是只读的，留个开始新陪学的入口，
+   * 用户不用先「返回当前」再「新建」走两步。 */
+  $('#btnStart').onclick = async () => {
+    if (historyId) return openNewSession();
+    return startStudy();
+  };
   // 暂停 / 继续 是同一个按钮：暂停只是停下采集，随时能接着听
   $('#btnPause').onclick = async () => { app.capturing ? await pauseStudy() : await resumeStudy(); };
   $('#btnEnd').onclick = endStudy;
@@ -183,14 +194,10 @@ function bindStudy() {
     const visible = await window.vt.toggleFloat();
     flash(visible ? '悬浮条已显示，主窗口已让位' : '悬浮条已收起');
   };
-  $('#btnNewSession').onclick = async () => {
-    if (app.capturing) { flash('先结束当前陪学', 'warn'); return; }
-    app.tutor.setConfig(app.cfg);
-    app.tutor.reset();
-    app.session = null;
-    await clearDraft();
-    resetStudyUI();
-  };
+  $('#btnBackLive').onclick = () => exitHistory();
+  /* 新建 = 先起名，再进入「准备就绪」。早期版本这里只是默默 reset 界面：
+   * 用户点了跟没点一样，还以为按钮坏了（原话：「新建点了没有反应」）。 */
+  $('#btnNewSession').onclick = () => openNewSession();
 }
 
 function resetStudyUI() {
@@ -200,7 +207,10 @@ function resetStudyUI() {
   $('#noteCount').textContent = '0 条';
   $('#studyTitle').textContent = '未开始';
   $('#studyMeta').textContent = '';
+  $('#historyChip').hidden = true;
+  $('#btnBackLive').hidden = true;
   $('#btnStart').disabled = false;
+  $('#btnStart').textContent = '开始陪学';
   $('#btnPause').disabled = true;
   $('#btnEnd').disabled = true;
   app.startedAt = 0;
@@ -226,9 +236,13 @@ async function startStudy() {
   if (!(await startCapture())) return;
 
   app.tutor.setConfig(app.cfg);
-  const title = '陪学 ' + timeStr();
-  app.tutor.start({ title });
-  app.session = { id: app.tutor.sessionId, title, startedAt: Date.now() };
+  /* 新建时起好的名字和 id 在这里复用。以前写死 '陪学 ' + timeStr()，
+   * 而且传给 tutor 的键是 title——tutor.start() 只认 meta.topic，
+   * 课程名从来没送进助教：提炼笔记时它不知道你在学什么课。 */
+  const title = (app.session && app.session.title) || ('陪学 ' + timeStr());
+  const sid = (app.session && app.session.id) || ('s' + Date.now());
+  app.tutor.start({ topic: title });
+  app.session = { id: sid, title, startedAt: (app.session && app.session.startedAt) || Date.now() };
 
   app.startedAt = Date.now();
   app.elapsedMs = 0;
@@ -616,6 +630,8 @@ async function endStudy() {
   app.session = null;
   currentSessionId = rec.id;
   renderSessionList();
+  // 刚结束的这次直接以「回看」态摆进主区域：标题、时间线、段数、笔记数一次齐活
+  renderHistory(rec);
 
   $('#btnEnd').disabled = true;
   $('#btnPause').disabled = true;
@@ -701,7 +717,239 @@ function bindLib() {
   $('#btnCopyGraph').onclick = copyGraph;
 }
 
+/* ============================ 应用内对话框 ============================
+ * 起名 / 重命名 / 确认删除都走这里。不用系统 prompt/confirm 的原因见
+ * styles.css：自制无边框窗口里系统弹窗风格割裂，且主窗口收进托盘时可能
+ * 被挡在后面抢不到焦点——用户看不见还以为按钮坏了。 */
+
+/**
+ * 模态对话框。有输入框时：确定 → trim 后的字符串（可能为 ''），取消 → null；
+ * 纯确认时：确定 → true，取消 → false。Esc / 点遮罩 = 取消。
+ */
+function openModal({ title, message = '', placeholder = '', value = '', okText = '确定', danger = false }) {
+  return new Promise((resolve) => {
+    const mask = $('#modalMask');
+    const okBtn = $('#modalOk');
+    const cancelBtn = $('#modalCancel');
+    $('#modalTitle').textContent = title;
+    $('#modalBody').innerHTML = escapeHtml(message)
+      + (placeholder === null ? '' : `<input id="modalInput" type="text" maxlength="60" placeholder="${escapeHtml(placeholder)}" />`);
+    okBtn.textContent = okText;
+    okBtn.className = 'btn' + (danger ? ' danger' : ' primary');
+    const input = $('#modalInput');
+    if (input) {
+      input.value = value || '';
+      setTimeout(() => { input.focus(); input.select(); }, 30);
+    }
+    mask.classList.add('show');
+
+    const done = (v) => {
+      mask.classList.remove('show');
+      okBtn.onclick = cancelBtn.onclick = mask.onclick = null;
+      document.onkeydown = null;
+      resolve(v);
+    };
+    okBtn.onclick = () => done(input ? input.value.trim() : true);
+    cancelBtn.onclick = () => done(input ? null : false);
+    // 点遮罩 = 取消。只有直接点在遮罩上才算（点对话框内部不算）
+    mask.onclick = (e) => { if (e.target === mask) done(input ? null : false); };
+    document.onkeydown = (e) => {
+      if (e.key === 'Escape') { e.preventDefault(); done(input ? null : false); }
+      // 起名是高频操作：输入框里回车直接确认，不用挪鼠标
+      if (e.key === 'Enter' && input && document.activeElement === input) { e.preventDefault(); okBtn.click(); }
+    };
+  });
+}
+
+/* ============================ 课程（陪学记录） ============================ */
+
+/**
+ * 新建：先起名，进入「准备就绪」状态。名字一路带到开始陪学和最终记录里——
+ * 用户在左侧列表和自己的笔记库里都认得出自己的课。
+ */
+async function openNewSession() {
+  if (app.capturing) { flash('陪学进行中，先结束或暂停再新建', 'warn'); return; }
+  const name = await openModal({
+    title: '新建陪学',
+    message: '给这次课程起个名字，以后在左侧列表和笔记库里都靠它找。',
+    placeholder: '比如：高等数学 · 第 3 章',
+    value: (app.session && app.session.title) || '',
+    okText: '创建',
+  });
+  if (name === null) return;                      // 取消
+  const title = name || ('陪学 ' + timeStr());    // 不起名也给个能认出来的默认名
+
+  exitHistory();
+  app.tutor.setConfig(app.cfg);
+  app.tutor.reset();
+  // 'S' 前缀和正式记录区分；这个会话只有产生内容才会进列表（草稿 / 结束两条路）
+  app.session = { id: 'S' + Date.now(), title, startedAt: Date.now() };
+  await clearDraft();
+  renderPending();
+  flash('已创建「' + title + '」，点「开始陪学」就行', 'ok');
+}
+
+/** 起好名、还没开始：主区域显示课程名 + 准备就绪 */
+function renderPending() {
+  const s = app.session;
+  $('#studyTitle').textContent = s ? s.title : '未开始';
+  $('#studyMeta').textContent = s ? '准备就绪 · 点「开始陪学」' : '';
+  $('#historyChip').hidden = true;
+  $('#btnBackLive').hidden = true;
+  $('#btnStart').disabled = false;
+  $('#btnStart').textContent = '开始陪学';
+  $('#btnPause').disabled = true;
+  $('#btnEnd').disabled = true;
+  $('#transcript').innerHTML = '<div class="empty">点「开始陪学」，然后切到 B站 / 网页 / 微信里的视频。<br/>软件会听系统声音，实时转写并提炼知识点。</div>';
+  $('#notes').innerHTML = '<div class="empty">还没有知识点</div>';
+  $('#liveCount').textContent = '0 段';
+  $('#noteCount').textContent = '0 条';
+}
+
+/**
+ * 把一条历史记录完整加载进主区域（转写 + 知识点 + 计数），只读回看。
+ * 早期版本点列表只切选中态和「笔记库」，主区域纹丝不动——用户原话：
+ * 「左边这些陪学点什么都没反应，那为什么要让人点」。
+ */
+function renderHistory(s) {
+  if (!s) return;
+  currentSessionId = s.id;
+  historyId = s.id;
+  const d = new Date(s.startedAt);
+  const de = s.endedAt ? new Date(s.endedAt) : null;
+  $('#studyTitle').textContent = s.title;
+  $('#historyChip').hidden = false;
+  // 陪学中 / 有未开始的新课时才需要「返回当前」，否则返回去的也是空屏
+  $('#btnBackLive').hidden = !(app.capturing || app.session);
+  $('#studyMeta').textContent =
+    `${d.getMonth() + 1}月${d.getDate()}日 ${pad(d.getHours())}:${pad(d.getMinutes())}`
+    + (de ? ` – ${pad(de.getHours())}:${pad(de.getMinutes())}` : '')
+    + ` · ${(s.transcript || []).length} 段 · ${(s.notes || []).length} 条笔记`;
+  // 回看只读：开始按钮变成「开始新陪学」（走起名流程），暂停 / 结束没有对象
+  $('#btnStart').disabled = false;
+  $('#btnStart').textContent = '开始新陪学';
+  $('#btnPause').disabled = true;
+  $('#btnEnd').disabled = true;
+
+  const segs = s.transcript || [];
+  $('#transcript').innerHTML = segs.length
+    ? segs.map((t) => `<div class="seg"><span class="tx">${escapeHtml(typeof t === 'string' ? t : (t.text || ''))}</span></div>`).join('')
+    : '<div class="empty">这次陪学没有留下转写</div>';
+  $('#liveCount').textContent = segs.length + ' 段';
+  renderNotes(s.notes || []);
+  renderSessionList();
+  renderLib();
+}
+
+/** 退出回看：陪学中回实时画面，有未开始的新课回准备态，否则回空屏 */
+function exitHistory() {
+  if (!historyId) return;
+  historyId = null;
+  if (app.capturing) renderLiveView();
+  else if (app.session) renderPending();
+  else resetStudyUI();
+}
+
+/** 陪学中从历史切回来：用 tutor 快照重绘一次实时画面（增量追加的那套不适用） */
+function renderLiveView() {
+  const snap = app.tutor.snapshot();
+  $('#historyChip').hidden = true;
+  $('#btnBackLive').hidden = true;
+  $('#studyTitle').textContent = app.session ? app.session.title : '陪学中';
+  $('#studyMeta').textContent = '每 ' + (app.cfg.chunkSeconds || 10) + ' 秒转写一次';
+  $('#btnStart').disabled = true;
+  $('#btnPause').disabled = false;
+  $('#btnEnd').disabled = false;
+  const segs = snap.transcript || [];
+  $('#transcript').innerHTML = segs.length
+    ? segs.map((t) => `<div class="seg"><span class="ts">${escapeHtml(t.tStart != null ? fmtPos(t.tStart) : clockOf(t.ts || Date.now()))}</span><span class="tx">${escapeHtml(t.text || '')}</span></div>`).join('')
+    : '<div class="empty">正在听…首条转写约 4 秒后出现。</div>';
+  $('#liveCount').textContent = segs.length + ' 段';
+  renderNotes(snap.notes || []);
+}
+
+/** 删一条记录。删完若正在回看它，主区域顺势往下走（有记录看记录，没记录空屏） */
+async function deleteSession(id) {
+  const s = app.sessions.find((x) => x.id === id);
+  if (!s) return;
+  const ok = await openModal({
+    title: '删除记录',
+    message: `「${s.title}」的转写、知识点和知识图谱都会一起删掉，找不回来。确定删吗？`,
+    okText: '删除', danger: true, placeholder: null,
+  });
+  if (!ok) return;
+  app.sessions = app.sessions.filter((x) => x.id !== id);
+  await saveSessions();
+  if (historyId === id) {
+    historyId = null;
+    // 删的正是正在回看的那条：优先回「新建好还没开始」的课，其次下一条记录，都没有才空屏
+    if (app.session) renderPending();
+    else if (app.sessions.length) renderHistory(app.sessions[0]);
+    else resetStudyUI();
+  }
+  renderSessionList();
+  flash('已删除「' + s.title + '」', 'ok');
+}
+
+/** 改个名。列表和（如正在回看）主区域立刻跟着变 */
+async function renameSession(id) {
+  const s = app.sessions.find((x) => x.id === id);
+  if (!s) return;
+  const name = await openModal({
+    title: '重命名',
+    message: '改个名字，以后更好找。',
+    placeholder: '课程名',
+    value: s.title,
+    okText: '保存',
+  });
+  if (name === null || !name) return;
+  s.title = name;
+  await saveSessions();
+  if (historyId === id) renderHistory(s);
+  else renderSessionList();
+  flash('已重命名', 'ok');
+}
+
+/**
+ * 首次启动放一条固定的示例记录。
+ * 判据是「store 里从来没有过记录」而不是「现在是空的」——用户手动删光之后
+ * 不该又被塞回来一条。新用户面对空列表根本不知道这软件能产出什么，
+ * 一条示例直接把「转写 + 知识点 + 图谱」的样子摆给他看，且示例本身
+ * 就是三条使用说明。
+ */
+const SAMPLE_SESSION = {
+  id: 'sample-0001',
+  title: '示例 · 一次陪学长这样',
+  startedAt: Date.now() - 45 * 60 * 1000,
+  endedAt: Date.now() - 40 * 60 * 1000,
+  notes: [
+    { id: 'n1', tag: '重点', title: '三步就能用起来', body: '① 点右上角「开始陪学」 ② 切到 B站 / 网校 / 微信里的视频 ③ 软件听系统声音，自动转写并提炼知识点。', ts: Date.now() - 44 * 60 * 1000 },
+    { id: 'n2', tag: '重点', title: '主窗口可以收成悬浮条', body: '开始陪学后点「悬浮条」，主窗口让位给一个巴掌大的浮窗；视频照常看，笔记照常记，点浮窗随时还原。', ts: Date.now() - 43 * 60 * 1000 },
+    { id: 'n3', tag: '考点', title: '记录只存在本机', body: '所有陪学记录存在这台电脑的数据文件里（设置页可见路径），不上传。不需要的记录，悬停左侧列表项点「删」即可。', ts: Date.now() - 42 * 60 * 1000 },
+  ],
+  transcript: [
+    '（这是一条固定示例，不是真实转写。点左侧「新建」开始你自己的第一次陪学。）',
+    '真正陪学时，这里会跟着视频实时滚动出说的话，每段带视频时间点，可以直接对回原视频。',
+    '右边的「知识点」由 AI 从转写里提炼，按 重点 / 易错点 / 拓展 / 公式 / 考点 分类；结束后在「笔记库」查看、导出 Markdown。',
+  ],
+  graph: {
+    mermaid: 'graph LR\n  A[开始陪学] --> B[听系统声音]\n  B --> C[实时转写]\n  C --> D[提炼知识点]\n  D --> E[知识图谱]',
+  },
+  sections: [],
+};
+
+async function seedSampleIfFirstRun() {
+  let raw;
+  try { raw = await window.vt.store.get(K_SESSIONS); } catch (_) {}
+  if (raw != null) return;
+  app.sessions = [JSON.parse(JSON.stringify(SAMPLE_SESSION))];
+  await saveSessions();
+  console.log('[boot] 首次启动，已放入示例记录');
+}
+
 let currentSessionId = null;
+/** 正在主区域回看的历史记录 id；null = 主区域是实时/准备态。 */
+let historyId = null;
 
 function renderSessionList() {
   const box = $('#sessionList');
@@ -718,16 +966,35 @@ function renderSessionList() {
     const active = s.id === currentSessionId ? ' active' : '';
     const d = new Date(s.startedAt);
     const sub = `${d.getMonth() + 1}月${d.getDate()}日 ${pad(d.getHours())}:${pad(d.getMinutes())} · ${(s.notes || []).length} 条笔记`;
-    return `<div class="listitem${active}" data-id="${s.id}">
+    return `<div class="listitem${active}" data-id="${s.id}" title="单击回看 · 双击重命名">
       <div class="t">${escapeHtml(s.title)}</div>
       <div class="s">${escapeHtml(sub)}</div>
+      <div class="acts">
+        <button class="ren" title="重命名">改</button>
+        <button class="del" title="删除">删</button>
+      </div>
     </div>`;
   }).join('');
   $$('#sessionList .listitem').forEach((el) => {
-    el.onclick = () => {
-      currentSessionId = el.dataset.id;
-      renderSessionList();
+    const id = el.dataset.id;
+    el.onclick = (e) => {
+      if (e.target.closest('.acts')) return;    // 点在「改 / 删」上不算选中
+      const s = app.sessions.find((x) => x.id === id);
+      if (!s) return;
+      if (app.capturing) {
+        /* 陪学进行中，主区域是实时画面，不能被历史记录盖掉（新转写会追加进
+         * 历史里，全乱）。只切选中态——「笔记库」视图跟着变，想细看旧笔记
+         * 切过去即可；完整回看等这次陪学结束。 */
+        currentSessionId = id;
+        renderSessionList();
+        flash('陪学进行中：已选中这条记录，完整回看请先结束', 'warn');
+        return;
+      }
+      renderHistory(s);
     };
+    el.ondblclick = () => renameSession(id);
+    el.querySelector('.ren').onclick = (e) => { e.stopPropagation(); renameSession(id); };
+    el.querySelector('.del').onclick = (e) => { e.stopPropagation(); deleteSession(id); };
   });
   renderLib();
 }

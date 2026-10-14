@@ -84,7 +84,9 @@
       <section class="view active" id="view-study">
         <div class="chead">
           <span class="title" id="studyTitle">未开始</span>
+          <span class="chip" id="historyChip" hidden>回看</span>
           <span class="meta" id="studyMeta"></span>
+          <button class="btn sm" id="btnBackLive" hidden title="回到正在陪学/刚新建的课程">返回当前</button>
           <div class="spacer"></div>
           <select id="srcSelect" style="height:26px;max-width:190px;border:1px solid var(--line-strong);border-radius:3px;background:#fff;padding:0 6px;"></select>
           <button class="btn primary" id="btnStart">开始陪学</button>
@@ -258,6 +260,18 @@
 </div>
 
 <div class="toast" id="toast"></div>
+
+<!-- 应用内对话框：命名新课程 / 重命名 / 确认删除。内容由 app.js 的 openModal 填充 -->
+<div class="modal-mask" id="modalMask">
+  <div class="modal">
+    <div class="m-head" id="modalTitle"></div>
+    <div class="m-body" id="modalBody"></div>
+    <div class="m-foot">
+      <button class="btn" id="modalCancel">取消</button>
+      <button class="btn primary" id="modalOk">确定</button>
+    </div>
+  </div>
+</div>
 
 <script type="module" src="./app.js"></script>
 </body>

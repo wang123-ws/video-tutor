@@ -155,6 +155,7 @@ button, input, select, textarea {
 .listpane-body { flex: 1; overflow-y: auto; }
 
 .listitem {
+  position: relative;   /* 悬停操作按钮的定位基准 */
   padding: 8px 10px;
   border-bottom: 1px solid #eee;
   cursor: default;
@@ -163,12 +164,34 @@ button, input, select, textarea {
 .listitem.active { background: var(--list-sel); }
 .listitem .t {
   font-size: 13px;
+  padding-right: 56px;   /* 给悬停出现的操作按钮留位，标题再长也不会钻到按钮下面 */
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .listitem .s {
   font-size: 11px; color: var(--text-3); margin-top: 2px;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
+
+/* 列表项悬停操作：重命名 / 删除。平时隐藏，hover 才出现——列表默认是干净的阅读态 */
+.listitem .acts {
+  position: absolute;
+  right: 6px; top: 8px;
+  display: none;
+  gap: 4px;
+}
+.listitem:hover .acts { display: flex; }
+.listitem .acts button {
+  width: 22px; height: 22px;
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  border-radius: var(--radius);
+  color: var(--text-2);
+  font-size: 12px; line-height: 1;
+  display: flex; align-items: center; justify-content: center;
+  cursor: default;
+}
+.listitem .acts button:hover { background: var(--surface-2); color: var(--text); }
+.listitem .acts button.del:hover { background: #fdecea; color: var(--err); border-color: #e0aaa6; }
 
 .empty {
   padding: 28px 16px;
@@ -573,4 +596,77 @@ pre.mermaid-src {
   width: 0%;
   background: var(--accent);
   transition: width .15s linear;
+}
+
+/* ============ 应用内对话框（命名 / 确认删除） ============
+ * 不用系统 prompt/confirm：frame:false 的自制窗口里系统弹窗风格割裂，
+ * 且主窗口收进托盘时可能被挡在后面抢不到焦点，用户看不见还以为点坏了。 */
+.modal-mask {
+  position: fixed; inset: 0;
+  background: rgba(20, 22, 26, .32);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 1000;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .12s linear;
+}
+.modal-mask.show { opacity: 1; pointer-events: auto; }
+.modal {
+  width: 380px;
+  max-width: calc(100vw - 48px);
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, .18);
+  transform: translateY(6px);
+  transition: transform .12s linear;
+}
+.modal-mask.show .modal { transform: translateY(0); }
+.modal .m-head {
+  padding: 12px 14px 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+.modal .m-body {
+  padding: 10px 14px 14px;
+  font-size: 12px;
+  color: var(--text-2);
+  line-height: 1.7;
+  user-select: text;
+}
+.modal .m-body input {
+  width: 100%;
+  margin-top: 8px;
+  height: 30px;
+  padding: 0 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  user-select: text;
+}
+.modal .m-body input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-soft);
+}
+.modal .m-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 0 14px 12px;
+}
+.modal .m-foot .btn { min-width: 64px; }
+/* 删除确认用实心红：这是不可逆操作，按钮必须在视觉上让人停一秒 */
+.modal .btn.danger { background: var(--err); border-color: var(--err); color: #fff; }
+.modal .btn.danger:hover { background: #9c2018; border-color: #9c2018; color: #fff; }
+
+/* 回看历史记录时的角标 + 返回入口 */
+.chead .chip {
+  padding: 1px 7px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-radius: 2px;
+  font-size: 11px;
 }
