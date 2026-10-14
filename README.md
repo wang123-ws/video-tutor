@@ -271,8 +271,8 @@ npm run latest -- --notes "这版改了什么"
 ```
 
 **客户端怎么找更新**：默认读 `desktop/update.json` 里的 `owner/repo`，去取该仓库 main 分支下的
-`latest.json`（优先走 jsDelivr，国内可直连；失败再走 raw + 镜像）。也可以在任何一台机器的
-「设置 → 更新源地址」里填一个自己的静态地址，会优先用它。
+`latest.json`（优先走 jsDelivr，国内可直连；失败再走 raw + 镜像）。也可以换源：改随包的
+`desktop/update.json`，或在数据文件里设 `vt_update_cfg.feedUrl` 指向任意静态地址，会优先用它。
 
 下载地址会依次尝试：原链接 → ghfast → gh-proxy → ghproxy 镜像，下完按 sha512 校验，
 不一致就自动换下一个源重试。

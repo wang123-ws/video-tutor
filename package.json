@@ -1,0 +1,12 @@
+{
+  "name": "video-tutor-workspace",
+  "version": "0.4.0",
+  "private": true,
+  "description": "视频陪学AI助教 · 仓库入口（构建在 desktop/，工具在 tools/）",
+  "scripts": {
+    "dist": "npm --prefix desktop run dist",
+    "latest": "node tools/make-latest.mjs",
+    "sync-core": "npm --prefix desktop run sync-core",
+    "fetch-asr": "npm --prefix desktop run fetch-asr"
+  }
+}

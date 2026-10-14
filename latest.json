@@ -1,9 +1,9 @@
 {
-  "version": "0.3.2",
-  "notes": "修复 ASR 中文路径导致无法转写；最小化按钮改为最小化到任务栏（仅关闭按钮收托盘）；修复无独显机器 GPU 崩溃导致 App 退出、按钮无响应；转写调度队列化，间隔不再发散；转写时间戳改为视频位置；设置页显示真实更新源",
-  "pubDate": "2026-10-13",
-  "url": "https://github.com/wang123-ws/video-tutor/releases/latest/download/Setup-0.3.2.exe",
-  "size": 250793583,
-  "sha512": "0dda1a0821f04507886b65ad3be82029f882c4f9aab5b9c4866b75e9533600128594af0efadeb569477a82f417d3e2b96230fb7564198e1f2a4d0a21ba371365",
-  "fileName": "Setup-0.3.2.exe"
+  "version": "0.4.0",
+  "notes": "课程管理：新建起名、历史回看、删除/重命名；修复重复启动双托盘图标；新用户首启示例",
+  "pubDate": "2026-10-14",
+  "url": "https://github.com/wang123-ws/video-tutor/releases/latest/download/Setup-0.4.0.exe",
+  "size": 250801398,
+  "sha512": "6c66cac3d8f2365e1d98a6da506fe5c1c8c2a3e25131491eb2361b2d60f89108bdbf38262a8249807dd03500a0017ee8812d6862348ae1a058449d6437028bbb",
+  "fileName": "Setup-0.4.0.exe"
 }

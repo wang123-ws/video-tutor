@@ -40,8 +40,14 @@ function findInstaller() {
     .map((f) => ({ f, m: fs.statSync(path.join(dist, f)).mtimeMs }))
     .sort((a, b) => b.m - a.m);
   const exact = files.find((x) => x.f.includes(version));
-  const picked = exact || files[0];
-  return picked ? path.join(dist, picked.f) : null;
+  /* 找不到对应版本的安装包时直接失败：曾经静默 fallback 到目录里最新的安装包，
+   * 生成过「清单版本号是新版、内容其实是旧安装包」的货不对板清单。 */
+  if (!exact) {
+    console.error(`dist 里没有 v${version} 的安装包（现有：${files.map((x) => x.f).join('、') || '空'}）。`);
+    console.error('先构建：cd desktop && npm run dist');
+    process.exit(1);
+  }
+  return path.join(dist, exact.f);
 }
 
 const exe = findInstaller();
