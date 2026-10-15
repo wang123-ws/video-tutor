@@ -243,6 +243,14 @@ async function startStudy() {
   const sid = (app.session && app.session.id) || ('s' + Date.now());
   app.tutor.start({ topic: title });
   app.session = { id: sid, title, startedAt: (app.session && app.session.startedAt) || Date.now() };
+  /* 没走「新建」直接开始陪学的，也往列表里占个位——否则陪学进行中，
+   * 左侧看不到正在听的这门课，它的字幕也一直是「未开始」。 */
+  if (!app.sessions.some((x) => x.id === sid)) {
+    app.sessions.unshift(app.session);
+    currentSessionId = sid;
+    saveSessions();
+    renderSessionList();
+  }
 
   app.startedAt = Date.now();
   app.elapsedMs = 0;
@@ -623,7 +631,10 @@ async function endStudy() {
     graph: snap.graph || null,
     sections: snap.sections || [],
   };
-  app.sessions.unshift(rec);
+  // 新建时进的占位条目就地换成正式记录；没有占位（直接开始陪学的老路径）才 unshift
+  const idx = app.sessions.findIndex((s) => s.id === rec.id);
+  if (idx >= 0) app.sessions[idx] = rec;
+  else app.sessions.unshift(rec);
   // 条数上限统一在 saveSessions() 里管（60 条），这里不再写第二套
   await saveSessions();
   await clearDraft();
@@ -664,7 +675,23 @@ function onTutorEvent(type, payload) {
       if (payload.level === 'warn') flash(payload.text, 'warn');
       break;
   }
-  if (type === 'transcript' || type === 'notes') { publishBus(); saveDraft(); }
+  if (type === 'transcript' || type === 'notes') { publishBus(); saveDraft(); syncLiveEntry(); }
+}
+
+/**
+ * 陪学中把实时内容同步进左侧列表对应的条目——否则正在听的这门课在列表里
+ * 一直停在「未开始」，用户看不到进度。只刷这一条的字幕，不重绘整个列表
+ * （重绘会打断悬停才出现的「改 / 删」按钮）。
+ */
+function syncLiveEntry() {
+  if (!app.session || !app.tutor) return;
+  const s = app.sessions.find((x) => x.id === app.session.id);
+  if (!s) return;
+  const snap = app.tutor.snapshot();
+  s.notes = snap.notes || [];
+  s.transcript = (snap.transcript || []).map((t) => (typeof t === 'string' ? t : t.text));
+  const el = document.querySelector('#sessionList .listitem[data-id="' + s.id + '"] .s');
+  if (el) el.textContent = subOf(s);
 }
 
 function appendTranscript(seg) {
@@ -782,16 +809,26 @@ async function openNewSession() {
   exitHistory();
   app.tutor.setConfig(app.cfg);
   app.tutor.reset();
-  // 'S' 前缀和正式记录区分；这个会话只有产生内容才会进列表（草稿 / 结束两条路）
-  app.session = { id: 'S' + Date.now(), title, startedAt: Date.now() };
+  /* 'S' 前缀和正式记录区分。创建即进左侧列表——以前只挂在 app.session 上，
+   * app.sessions（列表的数据源）里根本没有它，用户创建完左边什么都不出现
+   * （原话：「点击创建完左边为什么没有创建出来呢」）。占位条目在
+   * endStudy / rescueDraft 里被就地换成正式记录，不会重复。 */
+  const pending = { id: 'S' + Date.now(), title, startedAt: Date.now() };
+  app.session = pending;
+  app.sessions = app.sessions.filter((x) => x.id !== pending.id);
+  app.sessions.unshift(pending);
+  currentSessionId = pending.id;
   await clearDraft();
+  await saveSessions();          // 持久化：创建即保存，重启后这门课还在
   renderPending();
+  renderSessionList();
   flash('已创建「' + title + '」，点「开始陪学」就行', 'ok');
 }
 
 /** 起好名、还没开始：主区域显示课程名 + 准备就绪 */
 function renderPending() {
   const s = app.session;
+  historyId = null;        // 准备态不是回看：不清这个标志，「返回当前」和改名联动都会失灵
   $('#studyTitle').textContent = s ? s.title : '未开始';
   $('#studyMeta').textContent = s ? '准备就绪 · 点「开始陪学」' : '';
   $('#historyChip').hidden = true;
@@ -872,6 +909,9 @@ function renderLiveView() {
 async function deleteSession(id) {
   const s = app.sessions.find((x) => x.id === id);
   if (!s) return;
+  if (app.capturing && app.session && app.session.id === id) {
+    flash('这条正在陪学中，先结束再删', 'warn'); return;
+  }
   const ok = await openModal({
     title: '删除记录',
     message: `「${s.title}」的转写、知识点和知识图谱都会一起删掉，找不回来。确定删吗？`,
@@ -885,6 +925,12 @@ async function deleteSession(id) {
     // 删的正是正在回看的那条：优先回「新建好还没开始」的课，其次下一条记录，都没有才空屏
     if (app.session) renderPending();
     else if (app.sessions.length) renderHistory(app.sessions[0]);
+    else resetStudyUI();
+  }
+  // 删的正是主区域里「准备就绪」的那条：app.session 一起清，主区域顺势切换
+  if (app.session && app.session.id === id) {
+    app.session = null;
+    if (app.sessions.length) renderHistory(app.sessions[0]);
     else resetStudyUI();
   }
   renderSessionList();
@@ -904,6 +950,11 @@ async function renameSession(id) {
   });
   if (name === null || !name) return;
   s.title = name;
+  // 改的正是主区域里「准备就绪」的那条：app.session 和标题一起跟着变
+  if (app.session && app.session.id === id && !app.capturing) {
+    app.session.title = name;
+    if (!historyId) $('#studyTitle').textContent = name;
+  }
   await saveSessions();
   if (historyId === id) renderHistory(s);
   else renderSessionList();
@@ -951,6 +1002,13 @@ let currentSessionId = null;
 /** 正在主区域回看的历史记录 id；null = 主区域是实时/准备态。 */
 let historyId = null;
 
+/** 列表项副标题：没开始的课显示「未开始」，否则日期 + 笔记数 */
+function subOf(s) {
+  if (!s.endedAt) return '未开始 · 点「开始陪学」';
+  const d = new Date(s.startedAt);
+  return `${d.getMonth() + 1}月${d.getDate()}日 ${pad(d.getHours())}:${pad(d.getMinutes())} · ${(s.notes || []).length} 条笔记`;
+}
+
 function renderSessionList() {
   const box = $('#sessionList');
   if (!box) return;
@@ -964,11 +1022,9 @@ function renderSessionList() {
   }
   box.innerHTML = app.sessions.map((s) => {
     const active = s.id === currentSessionId ? ' active' : '';
-    const d = new Date(s.startedAt);
-    const sub = `${d.getMonth() + 1}月${d.getDate()}日 ${pad(d.getHours())}:${pad(d.getMinutes())} · ${(s.notes || []).length} 条笔记`;
     return `<div class="listitem${active}" data-id="${s.id}" title="单击回看 · 双击重命名">
       <div class="t">${escapeHtml(s.title)}</div>
-      <div class="s">${escapeHtml(sub)}</div>
+      <div class="s">${escapeHtml(subOf(s))}</div>
       <div class="acts">
         <button class="ren" title="重命名">改</button>
         <button class="del" title="删除">删</button>
@@ -990,6 +1046,9 @@ function renderSessionList() {
         flash('陪学进行中：已选中这条记录，完整回看请先结束', 'warn');
         return;
       }
+      /* 点的正是「新建好还没开始」的那条：回准备态，别盖个「回看」角标——
+       * 自己的课还没开始，标回看反而别扭。 */
+      if (app.session && app.session.id === id) { renderPending(); return; }
       renderHistory(s);
     };
     el.ondblclick = () => renameSession(id);
@@ -1217,9 +1276,24 @@ async function rescueDraft() {
   let d = null;
   try { d = await window.vt.store.get(K_DRAFT); } catch (_) {}
   if (!d || !d.id) return;
-  if (app.sessions.some((s) => s.id === d.id)) { await clearDraft(); return; }
   const hasContent = (d.notes || []).length || (d.transcript || []).length;
   if (!hasContent) { await clearDraft(); return; }
+  const exist = app.sessions.find((s) => s.id === d.id);
+  if (exist && !exist.endedAt) {
+    /* 新建时进的占位条目还在（建了课、刚开始听就崩了）：把草稿内容并进去。
+     * 不能像以前那样看到 id 存在就跳过——那条记录会永远停在空占位，
+     * 转写和笔记全丢。 */
+    exist.endedAt = d.savedAt || Date.now();
+    exist.notes = d.notes || [];
+    exist.transcript = d.transcript || [];
+    exist.graph = d.graph || null;
+    exist.sections = d.sections || [];
+    await saveSessions();
+    await clearDraft();
+    setTimeout(() => flash(`上次陪学没正常结束，已把 ${(d.notes || []).length} 条笔记抢救回笔记库`, 'ok'), 1200);
+    return;
+  }
+  if (exist) { await clearDraft(); return; }   // 已是正式记录，草稿是旧影分身
   app.sessions.unshift({
     id: d.id,
     title: (d.title || '陪学') + '（未正常结束）',
