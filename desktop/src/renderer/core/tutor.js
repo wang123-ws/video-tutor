@@ -93,6 +93,32 @@ export class Tutor {
     return this.snapshot();
   }
 
+  /**
+   * 从一条已结束的记录恢复上下文，继续陪学。
+   * 和 start() 的区别：不清空——转写、知识点、小节全部带回来，
+   * 新内容并进同一记录。用于「误点结束后接着听原来的课」：
+   * 以前结束只能「开始新陪学」（等于新建），原课程被拆成两半。
+   */
+  restore(rec = {}, meta = {}) {
+    this.reset();
+    this.topic = meta.topic || '';
+    this.transcript = (rec.transcript || []).map((t, i) => (
+      typeof t === 'string'
+        ? { seq: i, text: t, tStart: null, tEnd: null, ts: Date.now() }
+        : { ...t, seq: t.seq ?? i }
+    ));
+    this.notes = (rec.notes || []).map((n) => ({ ...n }));
+    this.sections = (Array.isArray(rec.sections) && rec.sections.length)
+      ? rec.sections.map((s) => ({ ...s, noteIds: (s.noteIds || []).slice() }))
+      : [{ index: 0, title: '', summary: '', noteIds: this.notes.map((n) => n.id) }];
+    this.seq = this.transcript.length;
+    this.state = STATE.LISTENING;
+    this.startedAt = Date.now();
+    this.emit('state', { state: this.state, sessionId: this.sessionId });
+    this.emit('log', { level: 'info', text: '继续上次的课程，转写与笔记上下文已恢复' });
+    return this.snapshot();
+  }
+
   /** 接收一段流式转写文本 */
   pushSegment({ text, tStart, tEnd } = {}) {
     const t = String(text || '').trim();

@@ -21,6 +21,7 @@ contextBridge.exposeInMainWorld('vt', {
   toggleFloat: () => ipcRenderer.invoke('float:toggle'),
   closeFloat: () => ipcRenderer.invoke('float:close'),
   floatVisible: () => ipcRenderer.invoke('float:visible'),
+  floatSetCompact: (on) => ipcRenderer.invoke('float:setCompact', !!on),
 
   /* 音频 / 转写 */
   sources: () => ipcRenderer.invoke('audio:sources'),

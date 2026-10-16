@@ -414,6 +414,15 @@ ipcMain.handle('float:toggle', () => {
   return true;
 });
 ipcMain.handle('float:visible', () => !!(floatWindow && !floatWindow.isDestroyed() && floatWindow.isVisible()));
+/* 悬浮条压缩态：缩成 28px 小条（只看状态+计时，不挡视频），再点还原。
+ * 窗口高度由主进程改（渲染层只能藏内容，改不了 BrowserWindow 尺寸）。 */
+ipcMain.handle('float:setCompact', (e, on) => {
+  const w = BrowserWindow.fromWebContents(e.sender);
+  if (!w || w !== floatWindow || w.isDestroyed()) return false;
+  const b = w.getBounds();
+  w.setBounds({ x: b.x, y: b.y, width: 430, height: on ? 28 : 150 }, false);
+  return true;
+});
 ipcMain.handle('float:close', () => {
   if (floatWindow && !floatWindow.isDestroyed()) floatWindow.close();
   if (mainWindow) showMainWindow();

@@ -180,11 +180,12 @@ async function checkAsr() {
 /* ============================ 陪学 ============================ */
 
 function bindStudy() {
-  /* 开始按钮在不同模式下干不同的事：回看历史记录时走新建流程（先起名），
-   * 否则直接开始陪学。回看时主区域是只读的，留个开始新陪学的入口，
-   * 用户不用先「返回当前」再「新建」走两步。 */
+  /* 开始按钮在不同模式下干不同的事：
+   *  - 回看历史记录 → 「继续陪学」：恢复这节课的上下文接着听，
+   *    不用先「返回当前」再操作，也杜绝了误点结束后原课被拆成两半；
+   *  - 否则直接开始陪学。 */
   $('#btnStart').onclick = async () => {
-    if (historyId) return openNewSession();
+    if (historyId) return continueStudy();
     return startStudy();
   };
   // 暂停 / 继续 是同一个按钮：暂停只是停下采集，随时能接着听
@@ -201,6 +202,8 @@ function bindStudy() {
 }
 
 function resetStudyUI() {
+  historyId = null;
+  viewingDemo = false;
   $('#transcript').innerHTML = '<div class="empty">点「开始陪学」，然后切到 B站 / 网页 / 微信里的视频。<br/>软件会听系统声音，实时转写并提炼知识点。</div>';
   $('#notes').innerHTML = '<div class="empty">还没有知识点</div>';
   $('#liveCount').textContent = '0 段';
@@ -280,6 +283,49 @@ async function startStudy() {
   setTimeout(async () => {
     try { await window.vt.openFloat(); } catch (_) {}
   }, 450);
+}
+
+/**
+ * 继续陪学：把一条已结束的记录恢复成「进行中」，接着采集。
+ * 解决用户的痛点：误点「结束」后，原先只能「开始新陪学」（等于新建），
+ * 原课程的转写和笔记被活生生拆成两半。现在回看态的主按钮就是继续这节课，
+ * 内容并回同一记录；结束后再点「继续陪学」还能接着来。
+ */
+async function continueStudy() {
+  if (app.capturing) return;
+  const rec = app.sessions.find((s) => s.id === historyId);
+  if (!rec) return openNewSession();
+  if (!app.asrReady) { await checkAsr(); if (!app.asrReady) { flash('语音引擎未就绪，无法转写', 'err'); return; } }
+  /* 先建音频链路再恢复助教——和 startStudy 同一个教训：音频一失败，
+   * 助教已经 restore 过、session 也建了，会留下"在听但什么都没采"的半启动状态。 */
+  if (!(await startCapture())) return;
+
+  app.tutor.setConfig(app.cfg);
+  app.tutor.restore(rec, { topic: rec.title });
+  app.session = { id: rec.id, title: rec.title, startedAt: rec.startedAt };
+  exitHistory();   // 历史内容先摆回主区域，新转写追加在后面
+
+  app.startedAt = Date.now();
+  app.elapsedMs = 0;
+  app.audioPosMs = 0;
+  app.asrFail = 0;
+  app.asrDropped = 0;
+  app.chunkSecondsNow = Math.min(4, Number(app.cfg.chunkSeconds) || 10);
+  app.lastFlushMs = 0;
+  app.maxPeakSeen = 0;
+  app.lastSoundAt = 0;
+
+  $('#dotAudio').className = 'st-dot on';
+  $('#stAudio').textContent = '捕获中';
+  $('#studyMeta').textContent = '继续陪学 · 每 ' + (app.cfg.chunkSeconds || 10) + ' 秒转写一次';
+
+  publishBus();
+  saveDraft();
+  // 自动收成悬浮条，用户直接切去播视频就行
+  setTimeout(async () => {
+    try { await window.vt.openFloat(); } catch (_) {}
+  }, 450);
+  flash('已继续「' + rec.title + '」，接着听就行', 'ok');
 }
 
 /** 建立系统音频采集。成功返回 true；失败会清干净现场并提示，不留半启动状态。 */
@@ -829,6 +875,7 @@ async function openNewSession() {
 function renderPending() {
   const s = app.session;
   historyId = null;        // 准备态不是回看：不清这个标志，「返回当前」和改名联动都会失灵
+  viewingDemo = false;
   $('#studyTitle').textContent = s ? s.title : '未开始';
   $('#studyMeta').textContent = s ? '准备就绪 · 点「开始陪学」' : '';
   $('#historyChip').hidden = true;
@@ -851,20 +898,27 @@ function renderPending() {
 function renderHistory(s) {
   if (!s) return;
   currentSessionId = s.id;
-  historyId = s.id;
+  /* 示例记录只是 boot 时摆出来给人看「这东西能产出什么」：不进回看态、不提供
+   * 「继续陪学」——否则新用户点一下主按钮，就会把真实转写并进假示例里，示例
+   * 本身也失去演示价值。老版本 seed 的示例没有 demo 字段，用 id 兜底。 */
+  const isDemo = s.demo || s.id === 'sample-0001';
+  if (!isDemo) historyId = s.id;
+  viewingDemo = isDemo;
   const d = new Date(s.startedAt);
   const de = s.endedAt ? new Date(s.endedAt) : null;
   $('#studyTitle').textContent = s.title;
-  $('#historyChip').hidden = false;
+  $('#historyChip').hidden = isDemo;
   // 陪学中 / 有未开始的新课时才需要「返回当前」，否则返回去的也是空屏
   $('#btnBackLive').hidden = !(app.capturing || app.session);
   $('#studyMeta').textContent =
     `${d.getMonth() + 1}月${d.getDate()}日 ${pad(d.getHours())}:${pad(d.getMinutes())}`
     + (de ? ` – ${pad(de.getHours())}:${pad(de.getMinutes())}` : '')
     + ` · ${(s.transcript || []).length} 段 · ${(s.notes || []).length} 条笔记`;
-  // 回看只读：开始按钮变成「开始新陪学」（走起名流程），暂停 / 结束没有对象
+  // 回看只读：主按钮是「继续陪学」——恢复这节课接着听（误点结束也不怕
+  // 原课被拆两半）；真要开新课走左上角「新建」，两个入口语义不重复。
+  // 示例记录例外：按钮是「开始陪学」，走了就是开一堂真正属于用户的新课。
   $('#btnStart').disabled = false;
-  $('#btnStart').textContent = '开始新陪学';
+  $('#btnStart').textContent = isDemo ? '开始陪学' : '继续陪学';
   $('#btnPause').disabled = true;
   $('#btnEnd').disabled = true;
 
@@ -880,8 +934,9 @@ function renderHistory(s) {
 
 /** 退出回看：陪学中回实时画面，有未开始的新课回准备态，否则回空屏 */
 function exitHistory() {
-  if (!historyId) return;
+  if (!historyId && !viewingDemo) return;
   historyId = null;
+  viewingDemo = false;
   if (app.capturing) renderLiveView();
   else if (app.session) renderPending();
   else resetStudyUI();
@@ -890,6 +945,8 @@ function exitHistory() {
 /** 陪学中从历史切回来：用 tutor 快照重绘一次实时画面（增量追加的那套不适用） */
 function renderLiveView() {
   const snap = app.tutor.snapshot();
+  historyId = null;
+  viewingDemo = false;
   $('#historyChip').hidden = true;
   $('#btnBackLive').hidden = true;
   $('#studyTitle').textContent = app.session ? app.session.title : '陪学中';
@@ -970,6 +1027,7 @@ async function renameSession(id) {
  */
 const SAMPLE_SESSION = {
   id: 'sample-0001',
+  demo: true,   // 标记：这是演示数据，不提供「继续陪学」
   title: '示例 · 一次陪学长这样',
   startedAt: Date.now() - 45 * 60 * 1000,
   endedAt: Date.now() - 40 * 60 * 1000,
@@ -1001,9 +1059,15 @@ async function seedSampleIfFirstRun() {
 let currentSessionId = null;
 /** 正在主区域回看的历史记录 id；null = 主区域是实时/准备态。 */
 let historyId = null;
+/** 主区域正在展示示例记录。示例不算「回看」（不可继续陪学），但用户从准备态
+ *  点进示例后，「返回当前」要能把他带回自己的课——所以需要一个独立标志。 */
+let viewingDemo = false;
 
-/** 列表项副标题：没开始的课显示「未开始」，否则日期 + 笔记数 */
+/** 列表项副标题：陪学中 / 没开始的课 / 正式记录，三种状态各一句话 */
 function subOf(s) {
+  if (app.capturing && app.session && s.id === app.session.id) {
+    return '陪学中 · ' + (s.notes || []).length + ' 条笔记';
+  }
   if (!s.endedAt) return '未开始 · 点「开始陪学」';
   const d = new Date(s.startedAt);
   return `${d.getMonth() + 1}月${d.getDate()}日 ${pad(d.getHours())}:${pad(d.getMinutes())} · ${(s.notes || []).length} 条笔记`;
@@ -1020,7 +1084,7 @@ function renderSessionList() {
   if (!currentSessionId || !app.sessions.some((s) => s.id === currentSessionId)) {
     currentSessionId = app.sessions[0].id;
   }
-  box.innerHTML = app.sessions.map((s) => {
+  box.innerHTML = app.sessions.filter((s) => s && s.id).map((s) => {
     const active = s.id === currentSessionId ? ' active' : '';
     return `<div class="listitem${active}" data-id="${s.id}" title="单击回看 · 双击重命名">
       <div class="t">${escapeHtml(s.title)}</div>
@@ -1077,8 +1141,93 @@ function renderLib() {
   } else {
     const g = s.graph;
     if (!g || !g.mermaid) { body.innerHTML = '<div class="empty">这次没有生成图谱</div>'; return; }
-    body.innerHTML = `<pre class="mermaid-src">${escapeHtml(g.mermaid)}</pre>`;
+    const nodes = g.nodes || [];
+    if (!nodes.length) {
+      // 没提炼出层级（内容太少）：退回显示源码，至少有东西可看
+      body.innerHTML = `<pre class="mermaid-src">${escapeHtml(g.mermaid)}</pre>`;
+      return;
+    }
+    body.innerHTML = graphSvg(g, s.notes || []);
   }
+}
+
+/* ---------------- 知识图谱可视化 ----------------
+ * 以前这里直接显示 mermaid 源码文本，用户原话「干巴巴的，我看我都不想复习」。
+ * 现在用 SVG 画成一棵有设计感的树：根节点药丸 → 一级知识点卡片（按标签配色）→
+ * 子要点小条，贝塞尔曲线连接。mermaid 源码保留在折叠区，导出/复制不受影响。 */
+const TAG_COLORS = {
+  重点: '#b3261e', 易错点: '#a86400', 拓展: '#2f6feb', 公式: '#6a2fb5', 考点: '#0e7c86',
+  定义: '#55606e', 结论: '#55606e', 辨析: '#55606e',
+};
+const TAG_TINTS = {
+  重点: '#fdecea', 易错点: '#fdf3e3', 拓展: '#e8f0fe', 公式: '#f1e8fa', 考点: '#e3f4f5',
+  定义: '#eef1f4', 结论: '#eef1f4', 辨析: '#eef1f4',
+};
+
+/** 按知识点名反查它对应笔记的标签（用于配色）；查不到返回空串 */
+function tagOfNode(name, notes) {
+  if (!name) return '';
+  const n = (notes || []).find((x) => x.title === name || x.title.startsWith(name) || name.startsWith(x.title));
+  return n ? (n.tag || '重点') : '';
+}
+
+function graphSvg(g, notes) {
+  const trunc = (s, n) => { s = String(s || ''); return s.length > n ? s.slice(0, n - 1) + '…' : s; };
+  const nodes = (g.nodes || []).slice(0, 8);
+  const ROW = 34, PAD = 8;
+  const X_ROOT = 10, W_ROOT = 116;
+  const X_L1 = 152, W_L1 = 196, H_L1 = 28;
+  const X_CH = 376, W_CH = 176, H_CH = 24;
+  const W = X_CH + W_CH + 10;
+
+  const blocks = nodes.map((n) => ({ n, kids: (n.children || []).slice(0, 6) }));
+  const rows = blocks.map((b) => Math.max(1, b.kids.length));
+  const totalRows = rows.reduce((a, b) => a + b, 0) || 1;
+  const H = Math.max(84, totalRows * ROW + PAD * 2);
+  const rootY = H / 2;
+
+  const out = [];
+  // 根： accent 色药丸
+  out.push(`<rect x="${X_ROOT}" y="${rootY - 17}" width="${W_ROOT}" height="34" rx="17" fill="#2f6feb"/>`);
+  out.push(`<text x="${X_ROOT + W_ROOT / 2}" y="${rootY + 4.5}" text-anchor="middle" fill="#fff" font-size="12.5" font-weight="600" font-family="system-ui,'Microsoft YaHei',sans-serif">${escapeHtml(trunc(g.root || '课程主题', 8))}</text>`);
+
+  let y = PAD;
+  blocks.forEach((b, bi) => {
+    const blockH = rows[bi] * ROW;
+    const cy = y + blockH / 2;
+    const tag = tagOfNode(b.n.name, notes);
+    const color = TAG_COLORS[tag] || '#7a7a7a';
+    const tint = TAG_TINTS[tag] || '#f2f2f2';
+    // 根 → 一级
+    out.push(`<path d="M ${X_ROOT + W_ROOT} ${rootY} C ${X_ROOT + W_ROOT + 28} ${rootY}, ${X_L1 - 28} ${cy}, ${X_L1} ${cy}" fill="none" stroke="#c9d2e0" stroke-width="1.5"/>`);
+    // 一级卡片：淡色底 + 同色系描边 + 左侧色条
+    out.push(`<rect x="${X_L1}" y="${cy - H_L1 / 2}" width="${W_L1}" height="${H_L1}" rx="6" fill="${tint}" stroke="${color}" stroke-opacity=".45"/>`);
+    out.push(`<rect x="${X_L1}" y="${cy - H_L1 / 2}" width="3.5" height="${H_L1}" rx="1.5" fill="${color}"/>`);
+    out.push(`<text x="${X_L1 + 12}" y="${cy + 4}" fill="#1f2733" font-size="12.5" font-weight="600" font-family="system-ui,'Microsoft YaHei',sans-serif">${escapeHtml(trunc(b.n.name, 13))}</text>`);
+    b.kids.forEach((c, ki) => {
+      const ky = y + ki * ROW + ROW / 2;
+      out.push(`<path d="M ${X_L1 + W_L1} ${cy} C ${X_L1 + W_L1 + 26} ${cy}, ${X_CH - 26} ${ky}, ${X_CH} ${ky}" fill="none" stroke="#d5dce6" stroke-width="1.2"/>`);
+      out.push(`<rect x="${X_CH}" y="${ky - H_CH / 2}" width="${W_CH}" height="${H_CH}" rx="5" fill="#ffffff" stroke="#dfe4ec"/>`);
+      out.push(`<circle cx="${X_CH + 12}" cy="${ky}" r="2.5" fill="${color}"/>`);
+      out.push(`<text x="${X_CH + 22}" y="${ky + 4}" fill="#3a4553" font-size="11.5" font-family="system-ui,'Microsoft YaHei',sans-serif">${escapeHtml(trunc(c.name, 12))}</text>`);
+    });
+    y += blockH;
+  });
+
+  // 图例：只列实际用到的标签
+  const used = [...new Set(nodes.map((n) => tagOfNode(n.name, notes)).filter(Boolean))];
+  const legend = used.length
+    ? `<div class="graph-legend">${used.map((t) =>
+        `<span><i style="background:${TAG_COLORS[t] || '#7a7a7a'}"></i>${escapeHtml(t)}</span>`).join('')}</div>`
+    : '';
+  return `<div class="graphwrap">
+    <svg class="graph-svg" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="知识图谱">${out.join('')}</svg>
+    ${legend}
+    <details class="graph-src">
+      <summary>Mermaid 源码（可复制到其他工具）</summary>
+      <pre class="mermaid-src">${escapeHtml(g.mermaid)}</pre>
+    </details>
+  </div>`;
 }
 
 function exportMd() {
@@ -1222,7 +1371,11 @@ function updateEngineStatus() {
 async function loadSessions() {
   try {
     const v = await window.vt.store.get(K_SESSIONS);
-    return Array.isArray(v) ? v : [];
+    // 过滤脏元素：store 被外部改坏（null / 非对象）时，renderSessionList 的
+    // s.id 会抛 TypeError 把整个 boot 带崩，列表一片空白。正常写入不会产生
+    // 这种数据，但存盘文件是用户可见可改的，防御成本一行，崩溃成本整个界面。
+    if (!Array.isArray(v)) return [];
+    return v.filter((s) => s && typeof s === 'object' && typeof s.id === 'string');
   } catch (_) { return []; }
 }
 
@@ -1279,10 +1432,9 @@ async function rescueDraft() {
   const hasContent = (d.notes || []).length || (d.transcript || []).length;
   if (!hasContent) { await clearDraft(); return; }
   const exist = app.sessions.find((s) => s.id === d.id);
-  if (exist && !exist.endedAt) {
-    /* 新建时进的占位条目还在（建了课、刚开始听就崩了）：把草稿内容并进去。
-     * 不能像以前那样看到 id 存在就跳过——那条记录会永远停在空占位，
-     * 转写和笔记全丢。 */
+  /* 合并条件：占位条目还没结束，或「结束后又继续过」——草稿比记录的 endedAt 新。
+   * 以前看到 id 存在就跳过，误点结束再继续的课，内容会整段丢失。 */
+  if (exist && (!exist.endedAt || (d.savedAt || 0) > exist.endedAt)) {
     exist.endedAt = d.savedAt || Date.now();
     exist.notes = d.notes || [];
     exist.transcript = d.transcript || [];
